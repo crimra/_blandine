@@ -52,14 +52,20 @@ export default function Details() {
 
             {/* Action Buttons */}
             <div className="flex gap-3 mt-8">
-              <button className="flex-1 flex items-center justify-center gap-2 bg-secondary-container text-on-secondary-container py-4 rounded-xl font-semibold active:scale-[0.98] transition-all">
+              <a 
+                href={`${window.location.origin}/map?pharmacy=${id}`}
+                className="flex-1 flex items-center justify-center gap-2 bg-secondary-container text-on-secondary-container py-4 rounded-xl font-semibold active:scale-[0.98] transition-all"
+              >
                 <span className="material-symbols-outlined">directions</span>
                 Itinéraire
-              </button>
-              <button className="flex-1 flex items-center justify-center gap-2 bg-surface-container-high text-on-surface py-4 rounded-xl font-semibold active:scale-[0.98] transition-all">
+              </a>
+              <a 
+                href={`tel:${pharmacy?.phone || ''}`}
+                className="flex-1 flex items-center justify-center gap-2 bg-surface-container-high text-on-surface py-4 rounded-xl font-semibold active:scale-[0.98] transition-all"
+              >
                 <span className="material-symbols-outlined">call</span>
                 Appeler
-              </button>
+              </a>
             </div>
           </div>
         </section>
@@ -149,10 +155,13 @@ export default function Details() {
 
       {/* Fixed Main CTA Button */}
       <div className="fixed bottom-0 left-0 w-full p-5 bg-gradient-to-t from-background via-background/95 to-transparent z-40">
-        <button className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 bg-gradient-to-r from-primary to-primary-container text-on-primary py-5 rounded-[1.5rem] font-bold text-lg shadow-xl hover:opacity-90 active:scale-[0.97] transition-all">
+        <a 
+          href={`${window.location.origin}/map?pharmacy=${id}`}
+          className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 bg-gradient-to-r from-primary to-primary-container text-on-primary py-5 rounded-[1.5rem] font-bold text-lg shadow-xl hover:opacity-90 active:scale-[0.97] transition-all"
+        >
           <span className="material-symbols-outlined">navigation</span>
           S'y rendre maintenant
-        </button>
+        </a>
       </div>
     </div>
   );

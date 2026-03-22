@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import TopAppBar from '../components/TopAppBar';
 import BottomNav from '../components/BottomNav';
 import PharmacyCard from '../components/PharmacyCard';
@@ -61,9 +62,13 @@ export default function Home() {
                     <p className="text-white font-bold text-lg">Voir sur la carte</p>
                     <p className="text-white/80 text-xs">Visualisez les pharmacies de garde autour de vous</p>
                   </div>
-                  <button className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform" style={{ backgroundColor: 'var(--primary)', color: '#000000' }}>
+                  <Link
+                    to="/map"
+                    className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+                    style={{ backgroundColor: 'var(--primary)', color: '#000000' }}
+                  >
                     <span className="material-symbols-outlined">map</span>
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>

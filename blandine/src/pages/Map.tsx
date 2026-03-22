@@ -3,10 +3,27 @@ import TopAppBar from '../components/TopAppBar';
 import BottomNav from '../components/BottomNav';
 import GoogleMapComponent from '../components/GoogleMap';
 import { pharmacies } from '../data/pharmacies';
+import { useGeolocation } from '../hooks/useGeolocation';
+import { formatDistance, calculateDistance } from '../utils/directions';
 import type { Pharmacy } from '../types/pharmacy';
 
 export default function Map() {
   const [selectedPharmacy, setSelectedPharmacy] = useState<Pharmacy | null>(null);
+  const [showDirections, setShowDirections] = useState(false);
+  const [filter24h, setFilter24h] = useState(false);
+  const [filterPCR, setFilterPCR] = useState(false);
+  const [filterVaccines, setFilterVaccines] = useState(false);
+  const { location: userLocation } = useGeolocation();
+
+  const displayedPharmacy = selectedPharmacy || pharmacies[0];
+
+  // Filter pharmacies based on active filters
+  const filteredPharmacies = pharmacies.filter((pharmacy) => {
+    if (filter24h && !pharmacy.isOpen24h) return false;
+    if (filterPCR && !pharmacy.offersPCR) return false;
+    if (filterVaccines && !pharmacy.offersVaccines) return false;
+    return true;
+  });
 
   return (
     <div className="h-screen flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -14,7 +31,7 @@ export default function Map() {
       <main className="relative flex-1 w-full pt-16 pb-20 overflow-hidden">
         {/* Google Map */}
         <GoogleMapComponent 
-          pharmacies={pharmacies}
+          pharmacies={filteredPharmacies}
           onPharmacySelect={setSelectedPharmacy}
         />
 
@@ -36,17 +53,44 @@ export default function Map() {
 
             {/* Chips */}
             <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-2 -mx-2 px-2">
-              <button className="flex items-center gap-1 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm hover:opacity-90 transition active:scale-95" style={{ backgroundColor: 'var(--primary)', color: '#000000' }}>
+              <button 
+                onClick={() => setFilter24h(!filter24h)}
+                className="flex items-center gap-1 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm transition active:scale-95" 
+                style={{ 
+                  backgroundColor: filter24h ? 'var(--primary)' : 'var(--surface-primary)', 
+                  color: filter24h ? '#000000' : 'var(--text-secondary)',
+                  borderColor: 'var(--border-subtle)',
+                  border: filter24h ? 'none' : '1px solid'
+                }}
+              >
                 <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                   schedule
                 </span>
                 Ouvert 24h/24
               </button>
-              <button className="flex items-center gap-1 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm hover:opacity-80 transition active:scale-95 border" style={{ backgroundColor: 'var(--surface-primary)', color: 'var(--text-secondary)', borderColor: 'var(--border-subtle)' }}>
+              <button 
+                onClick={() => setFilterPCR(!filterPCR)}
+                className="flex items-center gap-1 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm transition active:scale-95" 
+                style={{ 
+                  backgroundColor: filterPCR ? 'var(--primary)' : 'var(--surface-primary)', 
+                  color: filterPCR ? '#000000' : 'var(--text-secondary)',
+                  borderColor: 'var(--border-subtle)',
+                  border: filterPCR ? 'none' : '1px solid'
+                }}
+              >
                 <span className="material-symbols-outlined text-[16px]">biotech</span>
                 Tests PCR
               </button>
-              <button className="flex items-center gap-1 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm hover:opacity-80 transition active:scale-95 border" style={{ backgroundColor: 'var(--surface-primary)', color: 'var(--text-secondary)', borderColor: 'var(--border-subtle)' }}>
+              <button 
+                onClick={() => setFilterVaccines(!filterVaccines)}
+                className="flex items-center gap-1 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm transition active:scale-95" 
+                style={{ 
+                  backgroundColor: filterVaccines ? 'var(--primary)' : 'var(--surface-primary)', 
+                  color: filterVaccines ? '#000000' : 'var(--text-secondary)',
+                  borderColor: 'var(--border-subtle)',
+                  border: filterVaccines ? 'none' : '1px solid'
+                }}
+              >
                 <span className="material-symbols-outlined text-[16px]">vaccines</span>
                 Vaccinations
               </button>
@@ -83,17 +127,21 @@ export default function Map() {
                 </div>
               </div>
               <div className="flex gap-3">
-                <button className="flex-1 py-3 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--primary)', color: '#000000' }}>
+                <button 
+                  onClick={() => setShowDirections(true)}
+                  className="flex-1 py-3 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--primary)', color: '#000000' }}>
                   <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                     directions
                   </span>
                   S'y rendre
                 </button>
-                <button className="w-14 rounded-xl flex items-center justify-center active:scale-95 transition-transform" style={{ backgroundColor: 'var(--secondary)', color: '#000000' }}>
+                <a 
+                  href={`tel:${displayedPharmacy.phone}`}
+                  className="w-14 rounded-xl flex items-center justify-center active:scale-95 transition-transform" style={{ backgroundColor: 'var(--secondary)', color: '#000000' }}>
                   <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
                     call
                   </span>
-                </button>
+                </a>
               </div>
             </div>
           </div>
@@ -106,6 +154,137 @@ export default function Map() {
           </div>
         </div>
       </main>
+
+      {/* Directions Panel */}
+      {showDirections && userLocation && displayedPharmacy && (
+        <div className="fixed inset-0 z-40 flex items-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0"
+            onClick={() => setShowDirections(false)}
+            style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
+          />
+
+          {/* Direction Panel */}
+          <div
+            className="relative w-full max-w-md mx-auto rounded-t-3xl p-6 shadow-2xl"
+            style={{ backgroundColor: 'var(--surface-primary)' }}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowDirections(false)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: 'var(--surface-secondary)' }}
+            >
+              <span className="material-symbols-outlined" style={{ color: 'var(--text-primary)' }}>close</span>
+            </button>
+
+            {/* Pharmacy Info */}
+            <div className="space-y-6">
+              {/* Header */}
+              <div>
+                <h2 className="font-headline font-bold text-xl" style={{ color: 'var(--text-primary)' }}>
+                  {displayedPharmacy.name}
+                </h2>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  {displayedPharmacy.address}
+                </p>
+              </div>
+
+              {/* Distance & Time */}
+              <div className="grid grid-cols-3 gap-3">
+                <div
+                  className="rounded-lg p-3 text-center"
+                  style={{ backgroundColor: 'var(--surface-secondary)' }}
+                >
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Distance</p>
+                  <p className="font-bold text-lg mt-1" style={{ color: 'var(--primary)' }}>
+                    {userLocation && displayedPharmacy.latitude && displayedPharmacy.longitude
+                      ? formatDistance(
+                          calculateDistance(
+                            userLocation.latitude,
+                            userLocation.longitude,
+                            displayedPharmacy.latitude,
+                            displayedPharmacy.longitude
+                          )
+                        )
+                      : '—'}
+                  </p>
+                </div>
+                <div
+                  className="rounded-lg p-3 text-center"
+                  style={{ backgroundColor: 'var(--surface-secondary)' }}
+                >
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>À pied</p>
+                  <p className="font-bold text-lg mt-1" style={{ color: 'var(--secondary)' }}>
+                    {userLocation && displayedPharmacy.latitude && displayedPharmacy.longitude
+                      ? `~${Math.round(
+                          (calculateDistance(
+                            userLocation.latitude,
+                            userLocation.longitude,
+                            displayedPharmacy.latitude,
+                            displayedPharmacy.longitude
+                          ) /
+                            1.4) *
+                            60
+                        )} min`
+                      : '—'}
+                  </p>
+                </div>
+                <div
+                  className="rounded-lg p-3 text-center"
+                  style={{ backgroundColor: 'var(--surface-secondary)' }}
+                >
+                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Ouvert</p>
+                  <p
+                    className="font-bold text-lg mt-1"
+                    style={{ color: displayedPharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }}
+                  >
+                    {displayedPharmacy.isOpen ? '✓' : '✗'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Simple direction */}
+              <div
+                className="flex items-center gap-3 p-4 rounded-lg"
+                style={{ backgroundColor: 'var(--surface-secondary)' }}
+              >
+                <span className="text-4xl">📍</span>
+                <div className="flex-1">
+                  <p className="font-semibold" style={{ color: 'var(--primary)' }}>
+                    Itinéraire affichée sur la carte
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    Suivez le chemin bleu pour vous rendre à la pharmacie
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-3">
+                <a
+                  href={`tel:${displayedPharmacy.phone}`}
+                  className="flex-1 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                  style={{ backgroundColor: 'var(--primary)', color: '#000000' }}
+                >
+                  <span className="material-symbols-outlined">call</span>
+                  Appeler {displayedPharmacy.phone}
+                </a>
+                <button
+                  onClick={() => setShowDirections(false)}
+                  className="flex-1 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform"
+                  style={{ backgroundColor: 'var(--surface-secondary)', color: 'var(--text-primary)' }}
+                >
+                  <span className="material-symbols-outlined">close</span>
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </div>
   );

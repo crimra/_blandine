@@ -9,6 +9,9 @@ export interface Pharmacy {
   };
   services: string[];
   isOpen: boolean;
+  isOpen24h?: boolean;
+  offersPCR?: boolean;
+  offersVaccines?: boolean;
   openUntil?: string;
   rating: number;
   reviews: Review[];

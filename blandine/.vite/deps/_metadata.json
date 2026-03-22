@@ -1,0 +1,48 @@
+{
+  "hash": "fb398f99",
+  "configHash": "51c4c776",
+  "lockfileHash": "ce8a7197",
+  "browserHash": "0d0ebe01",
+  "optimized": {
+    "@vis.gl/react-google-maps": {
+      "src": "../../node_modules/@vis.gl/react-google-maps/dist/index.modern.mjs",
+      "file": "@vis__gl_react-google-maps.js",
+      "fileHash": "3d720ce4",
+      "needsInterop": false
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "ac941bc2",
+      "needsInterop": true
+    },
+    "react-router-dom": {
+      "src": "../../node_modules/react-router-dom/dist/index.mjs",
+      "file": "react-router-dom.js",
+      "fileHash": "c4e5022b",
+      "needsInterop": false
+    },
+    "react": {
+      "src": "../../node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "042b887a",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "9b8b436d",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "react-TUYU05Ph": {
+      "file": "react-TUYU05Ph.js",
+      "isDynamicEntry": false
+    },
+    "react-dom-DMGCgcj7": {
+      "file": "react-dom-DMGCgcj7.js",
+      "isDynamicEntry": false
+    }
+  }
+}

@@ -1,0 +1,111 @@
+import { useState } from 'react';
+import TopAppBar from '../components/TopAppBar';
+import BottomNav from '../components/BottomNav';
+import GoogleMapComponent from '../components/GoogleMap';
+import { pharmacies } from '../data/pharmacies';
+import type { Pharmacy } from '../types/pharmacy';
+
+export default function Map() {
+  const [selectedPharmacy, setSelectedPharmacy] = useState<Pharmacy | null>(null);
+
+  return (
+    <div className="bg-background h-screen flex flex-col">
+      <TopAppBar />
+      <main className="relative flex-1 w-full pt-16 pb-20 overflow-hidden">
+        {/* Google Map */}
+        <GoogleMapComponent 
+          pharmacies={pharmacies}
+          onPharmacySelect={setSelectedPharmacy}
+        />
+
+        {/* Overlay UI */}
+        <div className="absolute inset-0 pt-16 pb-20 pointer-events-none z-10 flex flex-col">
+          {/* Search & Filters Container */}
+          <div className="max-w-md mx-auto pointer-events-auto space-y-4 p-5">
+            {/* Search Bar */}
+            <div className="flex items-center bg-surface-container-lowest/90 backdrop-blur-md rounded-full px-4 h-14 shadow-[0_8px_32px_rgba(25,28,30,0.08)] border border-white/20">
+              <span className="material-symbols-outlined text-outline">search</span>
+              <input
+                className="flex-1 bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-outline-variant font-body px-3"
+                placeholder="Rechercher une pharmacie..."
+                type="text"
+              />
+              <span className="material-symbols-outlined text-outline">mic</span>
+            </div>
+
+            {/* Chips */}
+            <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-2 -mx-2 px-2">
+              <button className="flex items-center gap-1 bg-primary text-on-primary px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm hover:opacity-90 transition active:scale-95">
+                <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                  schedule
+                </span>
+                Ouvert 24h/24
+              </button>
+              <button className="flex items-center gap-1 bg-surface-container-lowest text-on-surface-variant px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm hover:bg-surface-container-high transition active:scale-95 border border-outline-variant/10">
+                <span className="material-symbols-outlined text-[16px]">biotech</span>
+                Tests PCR
+              </button>
+              <button className="flex items-center gap-1 bg-surface-container-lowest text-on-surface-variant px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm hover:bg-surface-container-high transition active:scale-95 border border-outline-variant/10">
+                <span className="material-symbols-outlined text-[16px]">vaccines</span>
+                Vaccinations
+              </button>
+            </div>
+          </div>
+
+          {/* Spacer to push bottom card down */}
+          <div className="flex-1"></div>
+
+          {/* Bottom Floating Card */}
+          <div className="pointer-events-auto max-w-md mx-auto w-full p-5">
+            <div className="bg-surface-container-lowest rounded-[2rem] p-5 shadow-[0_24px_48px_rgba(25,28,30,0.12)] border border-white/40 overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+              <div className="flex justify-between items-start mb-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.15em] font-label">
+                    {selectedPharmacy ? 'Sélectionné' : 'La plus proche'}
+                  </span>
+                  <h2 className="text-xl font-extrabold text-on-surface font-headline leading-tight">
+                    {selectedPharmacy?.name || pharmacies[0].name}
+                  </h2>
+                  <p className="text-xs text-outline font-body">
+                    {selectedPharmacy?.address || pharmacies[0].address}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-sm font-bold text-secondary font-headline">
+                    {selectedPharmacy?.distance || pharmacies[0].distance}
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-primary-fixed/30 text-on-primary-fixed-variant px-2 py-0.5 rounded-full text-[10px] font-bold mt-2">
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></span>
+                    {selectedPharmacy?.isOpen || pharmacies[0].isOpen ? 'OUVERT' : 'FERMÉ'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button className="flex-1 bg-gradient-to-r from-primary to-primary-container text-on-primary py-3 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2">
+                  <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    directions
+                  </span>
+                  S'y rendre
+                </button>
+                <button className="w-14 bg-secondary-container text-on-secondary-container rounded-xl flex items-center justify-center active:scale-95 transition-transform">
+                  <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>
+                    call
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Floating Action Button */}
+          <div className="absolute bottom-40 right-5 pointer-events-auto">
+            <button className="w-12 h-12 bg-surface-container-lowest text-primary rounded-full shadow-[0_8px_32px_rgba(25,28,30,0.06)] flex items-center justify-center border border-white active:scale-90 transition-transform">
+              <span className="material-symbols-outlined">my_location</span>
+            </button>
+          </div>
+        </div>
+      </main>
+      <BottomNav />
+    </div>
+  );
+}

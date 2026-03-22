@@ -13,15 +13,22 @@ export default function Map() {
   const [filter24h, setFilter24h] = useState(false);
   const [filterPCR, setFilterPCR] = useState(false);
   const [filterVaccines, setFilterVaccines] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { location: userLocation } = useGeolocation();
 
   const displayedPharmacy = selectedPharmacy || pharmacies[0];
 
-  // Filter pharmacies based on active filters
+  // Filter pharmacies based on active filters and search
   const filteredPharmacies = pharmacies.filter((pharmacy) => {
     if (filter24h && !pharmacy.isOpen24h) return false;
     if (filterPCR && !pharmacy.offersPCR) return false;
     if (filterVaccines && !pharmacy.offersVaccines) return false;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchesName = pharmacy.name.toLowerCase().includes(query);
+      const matchesAddress = pharmacy.address.toLowerCase().includes(query);
+      return matchesName || matchesAddress;
+    }
     return true;
   });
 
@@ -46,6 +53,8 @@ export default function Map() {
                 className="flex-1 bg-transparent border-none focus:ring-0 placeholder:text-current font-body px-3"
                 placeholder="Rechercher une pharmacie..."
                 type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 style={{ color: 'var(--text-primary)' }}
               />
               <span className="material-symbols-outlined" style={{ color: 'var(--text-tertiary)' }}>mic</span>

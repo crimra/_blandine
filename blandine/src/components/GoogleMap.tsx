@@ -39,12 +39,49 @@ const DirectionsDisplay = ({
       travelMode: (window as any).google.maps.TravelMode.WALKING,
     }).then((result: any) => {
       directionsRenderer.setDirections(result);
+      
+      // Centrer et zoomer la carte sur l'itinéraire
+      const bounds = new (window as any).google.maps.LatLngBounds();
+      if (result.routes[0]) {
+        result.routes[0].legs.forEach((leg: any) => {
+          leg.steps.forEach((step: any) => {
+            bounds.extend(step.start_location);
+            bounds.extend(step.end_location);
+          });
+        });
+        map?.fitBounds(bounds, { top: 80, right: 20, bottom: 200, left: 20 });
+      }
     }).catch((error: any) => {
       console.error('Erreur itinéraire:', error);
     });
-  }, [directionsService, directionsRenderer, showDirections, userLocation, selectedPharmacy]);
+  }, [directionsService, directionsRenderer, showDirections, userLocation, selectedPharmacy, map]);
 
   return null;
+};
+
+// Composant bouton recentrer
+const RecenterButton = ({ userLocation }: { userLocation: any }) => {
+  const map = useMap();
+
+  const handleRecenter = useCallback(() => {
+    if (!map || !userLocation) return;
+    map.moveCamera({
+      center: { lat: userLocation.latitude, lng: userLocation.longitude },
+      zoom: 14,
+    });
+  }, [map, userLocation]);
+
+  return (
+    <button
+      onClick={handleRecenter}
+      disabled={!userLocation}
+      className="absolute bottom-6 right-6 z-40 w-12 h-12 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-95 disabled:opacity-50"
+      style={{ backgroundColor: 'var(--primary)', color: 'var(--text-primary)' }}
+      title="Recentrer sur ma position"
+    >
+      <span className="material-symbols-outlined text-xl">my_location</span>
+    </button>
+  );
 };
 
 // Fonction pour générer l'URL Google Maps (legacy, si besoin futur)
@@ -132,6 +169,9 @@ export default function GoogleMapComponent({
             <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full" style={{ borderTopColor: 'transparent' }} />
           </div>
         )}
+
+        {/* Bouton recentrer */}
+        <RecenterButton userLocation={userLocation} />
 
         {/* Affichage de l'itinéraire */}
         <DirectionsDisplay 

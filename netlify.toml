@@ -1,4 +1,4 @@
 [build]
-base = "blandine"
+base = "_blandine"
 command = "npm run build"
 publish = "blandine/dist"

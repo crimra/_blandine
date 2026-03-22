@@ -10,27 +10,28 @@ export default function TopAppBar({ title = 'PharmaSerene', showBack = false, ac
   const navigate = useNavigate();
 
   return (
-    <header className="fixed top-0 w-full z-50 bg-[#f7f9fb]/80 dark:bg-slate-900/80 backdrop-blur-xl flex justify-between items-center px-5 h-16">
+    <header className="fixed top-0 w-full z-50 backdrop-blur-xl flex justify-between items-center px-5 h-16" style={{ backgroundColor: 'var(--surface-primary)', borderBottom: '1px solid var(--border-subtle)' }}>
       <div className="flex items-center gap-4">
         {showBack ? (
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-container transition-colors active:scale-95"
+            className="flex items-center justify-center w-10 h-10 rounded-full hover:opacity-80 transition-opacity active:scale-95"
+            style={{ color: 'var(--text-primary)' }}
           >
-            <span className="material-symbols-outlined text-on-surface">arrow_back</span>
+            <span className="material-symbols-outlined">arrow_back</span>
           </button>
         ) : (
-          <button className="text-primary dark:text-primary-fixed active:scale-95 duration-200">
+          <button className="active:scale-95 duration-200" style={{ color: 'var(--primary)' }}>
             <span className="material-symbols-outlined">menu</span>
           </button>
         )}
-        <h1 className="font-headline font-extrabold tracking-tighter text-primary dark:text-primary-fixed text-lg">
+        <h1 className="font-headline font-extrabold tracking-tighter text-lg" style={{ color: 'var(--primary)' }}>
           {title}
         </h1>
       </div>
       <div className="flex items-center gap-3">
         {actions}
-        <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-container">
+        <div className="w-8 h-8 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--surface-secondary)' }}>
           <img
             alt="Profile"
             className="w-full h-full object-cover"

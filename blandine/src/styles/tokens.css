@@ -1,0 +1,112 @@
+/* PharmaSerene Dark Mode Design System */
+
+:root {
+  /* Background & Surfaces - Dark Mode */
+  --bg-primary: #0D0F14;
+  --surface-primary: #161820;
+  --surface-secondary: #1F2430;
+  
+  /* Text Colors */
+  --text-primary: #FFFFFF;
+  --text-secondary: #B3B9C4;
+  --text-tertiary: #7D8491;
+  
+  /* Primary - Green */
+  --primary: #00D68F;
+  --primary-hover: #00C97F;
+  --primary-pressed: #00B370;
+  
+  /* Secondary - Blue */
+  --secondary: #4FACFE;
+  --secondary-hover: #3D9DFF;
+  --secondary-pressed: #2E8EFF;
+  
+  /* Accent Colors */
+  --accent-warning: #FFB800;     /* Garde/Nuit */
+  --accent-error: #FF4D6D;       /* Fermé */
+  --accent-user-location: #4FACFE;  /* Position utilisateur */
+  
+  /* State Colors */
+  --state-open: #00D68F;
+  --state-closed: #FF4D6D;
+  --state-guard: #FFB800;
+  
+  /* Borders & Dividers */
+  --border-subtle: rgba(179, 185, 196, 0.12);
+  --border-medium: rgba(179, 185, 196, 0.24);
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.24);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.40);
+  
+  /* Z-index */
+  --z-overlay: 50;
+  --z-modal: 100;
+  --z-sticky: 10;
+}
+
+/* Apply dark mode base styles */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Utility classes */
+.surface {
+  background-color: var(--surface-primary);
+}
+
+.surface-secondary {
+  background-color: var(--surface-secondary);
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+.button-primary {
+  background-color: var(--primary);
+  color: #000000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button-primary:hover {
+  background-color: var(--primary-hover);
+}
+
+.button-primary:active {
+  background-color: var(--primary-pressed);
+}
+
+.button-secondary {
+  background-color: var(--secondary);
+  color: #000000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.button-secondary:hover {
+  background-color: var(--secondary-hover);
+}
+
+.button-secondary:active {
+  background-color: var(--secondary-pressed);
+}

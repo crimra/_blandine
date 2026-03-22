@@ -8,16 +8,18 @@ import Account from './pages/Account';
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/map" element={<Map />} />
-        <Route path="/list" element={<List />} />
-        <Route path="/details/:id" element={<Details />} />
-        <Route path="/on-duty" element={<OnDuty />} />
-        <Route path="/account" element={<Account />} />
-      </Routes>
-    </Router>
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+      <Router>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/map" element={<Map />} />
+          <Route path="/list" element={<List />} />
+          <Route path="/details/:id" element={<Details />} />
+          <Route path="/on-duty" element={<OnDuty />} />
+          <Route path="/account" element={<Account />} />
+        </Routes>
+      </Router>
+    </div>
   );
 }
 

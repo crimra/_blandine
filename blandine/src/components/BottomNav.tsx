@@ -17,18 +17,18 @@ export default function BottomNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 w-full z-50 rounded-t-[2rem] bg-[#f7f9fb]/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-[0_-8px_32px_rgba(25,28,30,0.06)] flex justify-around items-center h-20 px-4 pb-safe w-full">
+    <nav className="fixed bottom-0 w-full z-50 rounded-t-[2rem] backdrop-blur-xl shadow-[0_-8px_32px_rgba(0,0,0,0.4)] flex justify-around items-center h-20 px-4 pb-safe w-full" style={{ backgroundColor: 'var(--surface-primary)', borderTop: '1px solid var(--border-subtle)' }}>
       {navItems.map((item) => {
         const isActive = location.pathname === item.path;
         return (
           <Link
             key={item.path}
             to={item.path}
-            className={`flex flex-col items-center justify-center rounded-xl px-4 py-1 active:scale-90 transition-transform duration-150 ${
-              isActive
-                ? 'text-[#006c51] dark:text-[#00a67e] bg-[#006c51]/10 dark:bg-[#00a67e]/10'
-                : 'text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
+            className={`flex flex-col items-center justify-center rounded-xl px-4 py-1 active:scale-90 transition-transform duration-150`}
+            style={{
+              color: isActive ? 'var(--primary)' : 'var(--text-tertiary)',
+              backgroundColor: isActive ? 'rgba(0, 214, 143, 0.1)' : 'transparent'
+            }}
           >
             <span 
               className="material-symbols-outlined" 

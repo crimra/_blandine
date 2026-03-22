@@ -1,5 +1,6 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from '@vis.gl/react-google-maps';
+import { useGeolocation } from '../hooks/useGeolocation';
 import type { Pharmacy } from '../types/pharmacy';
 
 interface GoogleMapProps {
@@ -8,19 +9,39 @@ interface GoogleMapProps {
   onPharmacySelect?: (pharmacy: Pharmacy) => void;
 }
 
-export default function GoogleMapComponent({ pharmacies, selectedPharmacyId, onPharmacySelect }: GoogleMapProps) {
+export default function GoogleMapComponent({ 
+  pharmacies, 
+  selectedPharmacyId, 
+  onPharmacySelect
+}: GoogleMapProps) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
-  const mapRef = useRef(null);
+  const { location: userLocation } = useGeolocation();
   const [selectedMarker, setSelectedMarker] = useState<string | null>(selectedPharmacyId || null);
 
-  // Coordonnées par défaut (Paris)
-  const defaultCenter = { lat: 48.8566, lng: 2.3522 };
+  // Debug: Vérifier que la clé est chargée
+  console.log('Google Maps API Key loaded:', apiKey ? '✅ YES' : '❌ MISSING');
+  console.log('API Key:', apiKey?.substring(0, 10) + '...' || 'undefined');
 
-  // Générer des coordonnées approximatives pour chaque pharmacie (mock)
+  if (!apiKey) {
+    return (
+      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: 'var(--surface-primary)' }}>
+        <div className="text-center p-6">
+          <p style={{ color: 'var(--accent-error)' }} className="font-bold">Erreur: Clé API Google Maps manquante</p>
+          <p style={{ color: 'var(--text-secondary)' }} className="text-sm mt-2">Vérifiez que .env contient VITE_GOOGLE_MAPS_KEY</p>
+        </div>
+      </div>
+    );
+  }
+
+  const defaultCenter = userLocation ? 
+    { lat: userLocation.latitude, lng: userLocation.longitude } 
+    : { lat: 48.8566, lng: 2.3522 };
+
+  // Utiliser les vraies coordonnées GPS depuis les données
   const pharmacyMarkers = pharmacies.map((pharmacy) => ({
     ...pharmacy,
-    lat: defaultCenter.lat + (Math.random() - 0.5) * 0.05,
-    lng: defaultCenter.lng + (Math.random() - 0.5) * 0.05
+    lat: pharmacy.latitude || defaultCenter.lat + (Math.random() - 0.5) * 0.05,
+    lng: pharmacy.longitude || defaultCenter.lng + (Math.random() - 0.5) * 0.05
   }));
 
   const handleMarkerClick = (pharmacy: Pharmacy) => {
@@ -28,16 +49,32 @@ export default function GoogleMapComponent({ pharmacies, selectedPharmacyId, onP
     onPharmacySelect?.(pharmacy);
   };
 
+  const getDirectionsUrl = (pharmacy: Pharmacy) => {
+    if (!userLocation || !pharmacy.latitude || !pharmacy.longitude) return '#';
+    return `https://www.google.com/maps/dir/${userLocation.latitude},${userLocation.longitude}/${pharmacy.latitude},${pharmacy.longitude}`;
+  };
+
   return (
     <APIProvider apiKey={apiKey}>
       <Map
-        ref={mapRef}
         style={{ width: '100%', height: '100%' }}
         defaultCenter={defaultCenter}
         defaultZoom={14}
+        mapId="DEMO_MAP_ID"
         gestureHandling="greedy"
         fullscreenControl={false}
       >
+        {/* Marker de la position de l'utilisateur */}
+        {userLocation && (
+          <AdvancedMarker
+            position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
+            title="Votre position"
+          >
+            <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
+          </AdvancedMarker>
+        )}
+
+        {/* Pins des pharmacies */}
         {pharmacyMarkers.map((pharmacy) => (
           <AdvancedMarker
             key={pharmacy.id}
@@ -63,25 +100,29 @@ export default function GoogleMapComponent({ pharmacies, selectedPharmacyId, onP
                     {pharmacy.isOpen ? (
                       <>
                         <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                        <span className="text-xs font-semibold text-primary">
-                          Ouvert
-                        </span>
+                        <span className="text-xs font-semibold text-primary">Ouvert</span>
                       </>
                     ) : (
-                      <span className="text-xs font-semibold text-error">
-                        Fermé
-                      </span>
+                      <span className="text-xs font-semibold text-error">Fermé</span>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <button className="flex-1 bg-primary text-on-primary text-xs py-2 rounded-md font-semibold active:scale-95 transition-transform">
-                      <span className="material-symbols-outlined text-[14px] inline mr-1">call</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <a
+                      href={`tel:${pharmacy.phone}`}
+                      className="flex items-center justify-center gap-1 bg-primary text-on-primary text-xs py-2 rounded-md font-semibold active:scale-95 transition-transform"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">call</span>
                       Appeler
-                    </button>
-                    <button className="flex-1 bg-secondary text-on-secondary text-xs py-2 rounded-md font-semibold active:scale-95 transition-transform">
-                      <span className="material-symbols-outlined text-[14px] inline mr-1">directions</span>
+                    </a>
+                    <a
+                      href={getDirectionsUrl(pharmacy)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1 bg-secondary text-on-secondary text-xs py-2 rounded-md font-semibold active:scale-95 transition-transform"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">directions</span>
                       Itinéraire
-                    </button>
+                    </a>
                   </div>
                 </div>
               </InfoWindow>

@@ -19,6 +19,7 @@ const reviews: Review[] = [
   }
 ];
 
+// Vraies coordonnées GPS de pharmacies à Paris
 export const pharmacies: Pharmacy[] = [
   {
     id: '1',
@@ -40,7 +41,9 @@ export const pharmacies: Pharmacy[] = [
     openUntil: '20:00',
     rating: 4.8,
     reviews: reviews,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCHm_W_I9covtiq0XLka2YJbNB-QeFJB1MTg80WyWERaCIFq70UZyYNXa84JmmRYkgT-kPySsnuRAHMk6uNqmjoUxCcIAMkgB4oP2Ng7ibAf9tNuBoadAGbSFNuFtdsJ9_zpqGdOJh_E6ijsoLC73RJJ_WrmSwhuVh2DLuYWYiFqM5Xb7l4NWC9uNgZCvBgB9ed-pv4pP-F24valEK9pfBu93oNZ0rFYKfhFdq-5IZHjW_q7LH6MbVh3OHWBnMfszg2_pGXRqJNIpA'
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCHm_W_I9covtiq0XLka2YJbNB-QeFJB1MTg80WyWERaCIFq70UZyYNXa84JmmRYkgT-kPySsnuRAHMk6uNqmjoUxCcIAMkgB4oP2Ng7ibAf9tNuBoadAGbSFNuFtdsJ9_zpqGdOJh_E6ijsoLC73RJJ_WrmSwhuVh2DLuYWYiFqM5Xb7l4NWC9uNgZCvBgB9ed-pv4pP-F24valEK9pfBu93oNZ0rFYKfhFdq-5IZHjW_q7LH6MbVh3OHWBnMfszg2_pGXRqJNIpA',
+    latitude: 48.8597,
+    longitude: 2.3710
   },
   {
     id: '2',
@@ -62,7 +65,9 @@ export const pharmacies: Pharmacy[] = [
     openUntil: '21:00',
     rating: 4.6,
     reviews: reviews,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB2-LrVqwqz7K5v-4L5Z5jM_q_zq8'
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB2-LrVqwqz7K5v-4L5Z5jM_q_zq8',
+    latitude: 48.8953,
+    longitude: 2.3961
   },
   {
     id: '3',
@@ -84,6 +89,8 @@ export const pharmacies: Pharmacy[] = [
     openUntil: '23:59',
     rating: 4.5,
     reviews: reviews,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB2-LrVqwqz7K5v-4L5Z5jM_q_zq8'
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuB2-LrVqwqz7K5v-4L5Z5jM_q_zq8',
+    latitude: 48.8566,
+    longitude: 2.3522
   }
 ];

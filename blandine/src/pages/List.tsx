@@ -2,16 +2,43 @@ import TopAppBar from '../components/TopAppBar';
 import BottomNav from '../components/BottomNav';
 import PharmacyCard from '../components/PharmacyCard';
 import { pharmacies } from '../data/pharmacies';
-import { useState } from 'react';
+import { useGeolocation } from '../hooks/useGeolocation';
+import { calculateDistance } from '../utils/distance';
+import { useState, useMemo } from 'react';
 
 export default function List() {
   const [openNow, setOpenNow] = useState(false);
   const [onlineDelivery, setOnlineDelivery] = useState(false);
   const [hasTests, setHasTests] = useState(false);
+  const { location } = useGeolocation();
 
-  const nearestPharmacy = pharmacies[0];
+  // Calculer les distances et trier par proximité
+  const pharmaciesWithDistance = useMemo(() => {
+    if (!location) return pharmacies;
+    
+    return pharmacies
+      .filter((pharmacy) => pharmacy.latitude !== undefined && pharmacy.longitude !== undefined)
+      .map((pharmacy) => ({
+        ...pharmacy,
+        calculatedDistance: calculateDistance(
+          location.latitude,
+          location.longitude,
+          pharmacy.latitude!,
+          pharmacy.longitude!
+        ),
+        distance: `${calculateDistance(
+          location.latitude,
+          location.longitude,
+          pharmacy.latitude!,
+          pharmacy.longitude!
+        ).toFixed(1)} km`
+      }))
+      .sort((a, b) => a.calculatedDistance - b.calculatedDistance);
+  }, [location]);
+
+  const nearestPharmacy = pharmaciesWithDistance[0];
   
-  const filteredPharmacies = pharmacies.filter((pharmacy) => {
+  const filteredPharmacies = pharmaciesWithDistance.filter((pharmacy) => {
     if (openNow && !pharmacy.isOpen) return false;
     if (hasTests && !pharmacy.offersPCR) return false;
     return true;

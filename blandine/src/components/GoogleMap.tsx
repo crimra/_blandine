@@ -130,7 +130,7 @@ export default function GoogleMapComponent({
 
   const defaultCenter = userLocation ? 
     { lat: userLocation.latitude, lng: userLocation.longitude } 
-    : { lat: -4.2634, lng: 15.2429 }; // Brazzaville fallback
+    : { lat: -4.2634, lng: 15.2429 }; // Kinshasa, RDC fallback
 
   // Mémoriser les markers pour éviter les re-calculs
   const pharmacyMarkers = useMemo(() => 
@@ -230,12 +230,12 @@ export default function GoogleMapComponent({
                       Appeler
                     </a>
                     <button
-                      onClick={() => setShowDirections(!showDirections)}
+                      onClick={() => setShowDirections(true)}
                       className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-transform"
                       style={{ backgroundColor: 'var(--secondary)', color: '#000000' }}
                     >
                       <span className="material-symbols-outlined text-[16px]">directions</span>
-                      {showDirections ? 'Masquer' : 'Itinéraire'}
+                      S'y rendre
                     </button>
                   </div>
                 </div>

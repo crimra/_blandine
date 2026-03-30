@@ -31,10 +31,10 @@ export function useGeolocation() {
       (error) => {
         setError(error.message);
         setLoading(false);
-        // Fallback: centre de Paris
+        // Fallback: Kinshasa, RDC
         setLocation({
-          latitude: 48.8566,
-          longitude: 2.3522,
+          latitude: -4.2634,
+          longitude: 15.2429,
           accuracy: 0
         });
       }

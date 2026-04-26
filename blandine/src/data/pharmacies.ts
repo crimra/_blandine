@@ -23,6 +23,7 @@ const reviews: Review[] = [
 export const pharmacies: Pharmacy[] = [
   {
     id: '1',
+    placeId: 'pharmacy-1',
     name: 'Pharmacie du Grand Siècle',
     address: '42 Avenue de la République, 75011 Paris',
     distance: '0.4 km',
@@ -41,6 +42,7 @@ export const pharmacies: Pharmacy[] = [
     isOpen24h: false,
     offersPCR: true,
     offersVaccines: true,
+    status: 'normal',
     openUntil: '20:00',
     rating: 4.8,
     reviews: reviews,
@@ -50,6 +52,7 @@ export const pharmacies: Pharmacy[] = [
   },
   {
     id: '2',
+    placeId: 'pharmacy-2',
     name: 'Pharmacie des Lilas',
     address: 'Place de la Mairie, Pantin',
     distance: '1.8 km',
@@ -68,6 +71,7 @@ export const pharmacies: Pharmacy[] = [
     isOpen24h: false,
     offersPCR: true,
     offersVaccines: true,
+    status: 'normal',
     openUntil: '21:00',
     rating: 4.6,
     reviews: reviews,
@@ -77,6 +81,7 @@ export const pharmacies: Pharmacy[] = [
   },
   {
     id: '3',
+    placeId: 'pharmacy-3',
     name: 'Pharmacie Centrale H24',
     address: '8 Rue de Rivoli, Paris',
     distance: '3.2 km',
@@ -95,6 +100,7 @@ export const pharmacies: Pharmacy[] = [
     isOpen24h: true,
     offersPCR: true,
     offersVaccines: true,
+    status: 'guard',
     openUntil: '23:59',
     rating: 4.5,
     reviews: reviews,

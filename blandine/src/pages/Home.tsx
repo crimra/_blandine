@@ -3,10 +3,16 @@ import TopAppBar from '../components/TopAppBar';
 import BottomNav from '../components/BottomNav';
 import PharmacyCard from '../components/PharmacyCard';
 import { pharmacies } from '../data/pharmacies';
+import { isPharmacyOpenNow } from '../utils/availability';
 
 export default function Home() {
-  const nearestPharmacy = pharmacies[0];
-  const otherPharmacies = pharmacies.slice(1);
+  const dynamicPharmacies = pharmacies.map((pharmacy) => ({
+    ...pharmacy,
+    isOpen: isPharmacyOpenNow(undefined, pharmacy.isOpen)
+  }));
+
+  const nearestPharmacy = dynamicPharmacies[0];
+  const otherPharmacies = dynamicPharmacies.slice(1);
 
   return (
     <div className="min-h-screen pb-20" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>

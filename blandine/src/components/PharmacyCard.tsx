@@ -4,9 +4,12 @@ import type { Pharmacy } from '../types/pharmacy';
 interface PharmacyCardProps {
   pharmacy: Pharmacy;
   variant?: 'compact' | 'featured';
+  hideAvailability?: boolean;
 }
 
-export default function PharmacyCard({ pharmacy, variant = 'compact' }: PharmacyCardProps) {
+export default function PharmacyCard({ pharmacy, variant = 'compact', hideAvailability = false }: PharmacyCardProps) {
+  const hasReliableHours = !!pharmacy.openUntil && pharmacy.openUntil !== '--:--';
+
   if (variant === 'featured') {
     return (
       <div className="rounded-3xl p-6 shadow-lg relative overflow-hidden group border-none" style={{ backgroundColor: 'var(--surface-primary)' }}>
@@ -25,18 +28,26 @@ export default function PharmacyCard({ pharmacy, variant = 'compact' }: Pharmacy
             </h3>
             <p className="font-medium text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{pharmacy.address}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider" style={{ backgroundColor: pharmacy.isOpen ? 'rgba(0, 214, 143, 0.2)' : 'rgba(255, 77, 109, 0.2)', color: pharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }}>
-              <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: pharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }} />
-              {pharmacy.isOpen ? 'Ouvert' : 'Fermé'}
-            </span>
-            <span className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>
-              Ferme à {pharmacy.openUntil}
-            </span>
-          </div>
+          {!hideAvailability && (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider" style={{ backgroundColor: pharmacy.isOpen ? 'rgba(0, 214, 143, 0.2)' : 'rgba(255, 77, 109, 0.2)', color: pharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }}>
+                <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: pharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }} />
+                {pharmacy.isOpen ? 'Ouvert' : 'Fermé'}
+              </span>
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                {pharmacy.isOpen
+                  ? hasReliableHours
+                    ? `Ferme à ${pharmacy.openUntil}`
+                    : 'Horaires indisponibles'
+                  : hasReliableHours
+                    ? `Ferme à ${pharmacy.openUntil}`
+                    : 'Horaires indisponibles'}
+              </span>
+            </div>
+          )}
           <div className="flex gap-2 pt-2">
             <Link
-              to={`/details/${pharmacy.id}`}
+              to={`/directions/${pharmacy.id}`}
               className="flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform"
               style={{ backgroundColor: 'var(--primary)', color: '#000000' }}
             >
@@ -73,14 +84,22 @@ export default function PharmacyCard({ pharmacy, variant = 'compact' }: Pharmacy
             <span className="font-headline font-bold text-sm" style={{ color: 'var(--secondary)' }}>{pharmacy.distance}</span>
           </div>
           <p className="text-xs font-medium truncate mb-2" style={{ color: 'var(--text-secondary)' }}>{pharmacy.address}</p>
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider" style={{ backgroundColor: pharmacy.isOpen ? 'rgba(0, 214, 143, 0.2)' : 'rgba(255, 77, 109, 0.2)', color: pharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }}>
-              {pharmacy.isOpen ? 'Ouvert' : 'Fermé'}
-            </span>
-            <span className="text-[10px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
-              {pharmacy.isOpen ? `Ferme à ${pharmacy.openUntil}` : `Ouvre demain à 08:30`}
-            </span>
-          </div>
+          {!hideAvailability && (
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider" style={{ backgroundColor: pharmacy.isOpen ? 'rgba(0, 214, 143, 0.2)' : 'rgba(255, 77, 109, 0.2)', color: pharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }}>
+                {pharmacy.isOpen ? 'Ouvert' : 'Fermé'}
+              </span>
+              <span className="text-[10px] font-medium" style={{ color: 'var(--text-tertiary)' }}>
+                {pharmacy.isOpen
+                  ? hasReliableHours
+                    ? `Ferme à ${pharmacy.openUntil}`
+                    : 'Horaires indisponibles'
+                  : hasReliableHours
+                    ? `Ferme à ${pharmacy.openUntil}`
+                    : 'Horaires indisponibles'}
+              </span>
+            </div>
+          )}
         </Link>
       </div>
     </div>

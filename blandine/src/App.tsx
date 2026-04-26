@@ -4,7 +4,7 @@ import Map from './pages/Map';
 import List from './pages/List';
 import Details from './pages/Details';
 import OnDuty from './pages/OnDuty';
-import Account from './pages/Account';
+import Directions from './pages/Directions';
 
 function App() {
   return (
@@ -15,8 +15,8 @@ function App() {
           <Route path="/map" element={<Map />} />
           <Route path="/list" element={<List />} />
           <Route path="/details/:id" element={<Details />} />
+          <Route path="/directions/:id" element={<Directions />} />
           <Route path="/on-duty" element={<OnDuty />} />
-          <Route path="/account" element={<Account />} />
         </Routes>
       </Router>
     </div>

@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom';
 import TopAppBar from '../components/TopAppBar';
 import { pharmacies } from '../data/pharmacies';
+import { isPharmacyOpenNow } from '../utils/availability';
 
 export default function Details() {
   const { id } = useParams();
@@ -9,6 +10,9 @@ export default function Details() {
   if (!pharmacy) {
     return <div>Pharmacie non trouvée</div>;
   }
+
+  const isOpenNow = isPharmacyOpenNow(undefined, pharmacy.isOpen);
+  const mapPlaceId = encodeURIComponent(pharmacy.placeId ?? pharmacy.id);
 
   return (
     <div className="bg-background text-on-background min-h-screen pb-24">
@@ -23,8 +27,8 @@ export default function Details() {
           />
           <div className="absolute bottom-6 right-6">
             <div className="bg-primary-fixed text-on-primary-fixed-variant px-4 py-2 rounded-full font-label text-sm font-semibold flex items-center shadow-lg">
-              <span className="w-2 h-2 rounded-full bg-primary animate-pulse mr-2" />
-              Ouvert actuellement
+              <span className={`w-2 h-2 rounded-full animate-pulse mr-2 ${isOpenNow ? 'bg-primary' : 'bg-red-500'}`} />
+              {isOpenNow ? 'Ouvert actuellement' : 'Ferme actuellement'}
             </div>
           </div>
         </section>
@@ -53,7 +57,7 @@ export default function Details() {
             {/* Action Buttons */}
             <div className="flex gap-3 mt-8">
               <a 
-                href={`${window.location.origin}/map?pharmacy=${id}`}
+                href={`/directions/${pharmacy.id}`}
                 className="flex-1 flex items-center justify-center gap-2 bg-secondary-container text-on-secondary-container py-4 rounded-xl font-semibold active:scale-[0.98] transition-all"
               >
                 <span className="material-symbols-outlined">directions</span>
@@ -156,7 +160,7 @@ export default function Details() {
       {/* Fixed Main CTA Button */}
       <div className="fixed bottom-0 left-0 w-full p-5 bg-gradient-to-t from-background via-background/95 to-transparent z-40">
         <a 
-          href={`${window.location.origin}/map?pharmacy=${id}`}
+          href={`${window.location.origin}/map?placeId=${mapPlaceId}`}
           className="w-full max-w-2xl mx-auto flex items-center justify-center gap-3 bg-gradient-to-r from-primary to-primary-container text-on-primary py-5 rounded-[1.5rem] font-bold text-lg shadow-xl hover:opacity-90 active:scale-[0.97] transition-all"
         >
           <span className="material-symbols-outlined">navigation</span>

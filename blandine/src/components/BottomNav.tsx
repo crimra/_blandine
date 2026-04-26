@@ -9,8 +9,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: 'map', label: 'Carte', path: '/map' },
   { icon: 'format_list_bulleted', label: 'Liste', path: '/list' },
-  { icon: 'medical_services', label: 'De Garde', path: '/on-duty' },
-  { icon: 'person', label: 'Compte', path: '/account' }
+  { icon: 'medical_services', label: 'De Garde', path: '/on-duty' }
 ];
 
 export default function BottomNav() {

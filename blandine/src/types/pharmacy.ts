@@ -1,5 +1,6 @@
 export interface Pharmacy {
   id: string;
+  placeId?: string;
   name: string;
   address: string;
   distance: string;
@@ -12,6 +13,7 @@ export interface Pharmacy {
   isOpen24h?: boolean;
   offersPCR?: boolean;
   offersVaccines?: boolean;
+  status?: 'guard' | 'normal';
   openUntil?: string;
   rating: number;
   reviews: Review[];

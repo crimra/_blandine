@@ -1,60 +1,226 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { APIProvider, Map, AdvancedMarker, Pin, useMap } from '@vis.gl/react-google-maps';
 import { useGeolocation } from '../hooks/useGeolocation';
+import { DEFAULT_CENTER } from '../constants';
 import type { Pharmacy } from '../types/pharmacy';
+import { decodePolyline } from '../utils/googleDirections';
+
+type TravelMode = 'WALKING' | 'DRIVING';
 
 // Composant pour afficher l'itinéraire sur la carte
 const DirectionsDisplay = ({ 
   userLocation, 
   selectedPharmacy, 
-  showDirections 
+  showDirections,
+  travelMode,
 }: { 
   userLocation: any; 
   selectedPharmacy: Pharmacy | null; 
   showDirections: boolean;
+  travelMode: TravelMode;
 }) => {
   const map = useMap();
-  const routesLibrary = useMapsLibrary('routes');
-  const [directionsService, setDirectionsService] = useState<any>(null);
-  const [directionsRenderer, setDirectionsRenderer] = useState<any>(null);
+  const routePolylineRef = useRef<any>(null);
+  const directionsRendererRef = useRef<any>(null);
 
-  // Initialiser les services
+  // Récupérer et afficher l'itinéraire réel via Google Maps DirectionsService
   useEffect(() => {
-    if (!routesLibrary || !map) return;
+    const destinationLat = (selectedPharmacy as any)?.latitude ?? (selectedPharmacy as any)?.lat;
+    const destinationLng = (selectedPharmacy as any)?.longitude ?? (selectedPharmacy as any)?.lng;
 
-    setDirectionsService(new routesLibrary.DirectionsService());
-    setDirectionsRenderer(new routesLibrary.DirectionsRenderer({ map }));
-  }, [routesLibrary, map]);
-
-  // Calculer et afficher l'itinéraire
-  useEffect(() => {
-    if (!directionsService || !directionsRenderer || !showDirections || !userLocation || !selectedPharmacy) {
-      directionsRenderer?.setDirections({ routes: [] });
+    if (
+      !map ||
+      !showDirections ||
+      !userLocation ||
+      !selectedPharmacy ||
+      destinationLat === undefined ||
+      destinationLng === undefined
+    ) {
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+        directionsRendererRef.current = null;
+      }
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setMap(null);
+        routePolylineRef.current = null;
+      }
       return;
     }
 
-    directionsService.route({
-      origin: new (window as any).google.maps.LatLng(userLocation.latitude, userLocation.longitude),
-      destination: new (window as any).google.maps.LatLng(selectedPharmacy.latitude, selectedPharmacy.longitude),
-      travelMode: (window as any).google.maps.TravelMode.WALKING,
-    }).then((result: any) => {
-      directionsRenderer.setDirections(result);
-      
-      // Centrer et zoomer la carte sur l'itinéraire
+    if (routePolylineRef.current) {
+      routePolylineRef.current.setMap(null);
+      routePolylineRef.current = null;
+    }
+
+    if (directionsRendererRef.current) {
+      directionsRendererRef.current.setMap(null);
+      directionsRendererRef.current = null;
+    }
+
+    const fitPathBounds = (pathPoints: Array<{ lat: number; lng: number }>) => {
+      if (!pathPoints.length) return;
       const bounds = new (window as any).google.maps.LatLngBounds();
-      if (result.routes[0]) {
-        result.routes[0].legs.forEach((leg: any) => {
-          leg.steps.forEach((step: any) => {
-            bounds.extend(step.start_location);
-            bounds.extend(step.end_location);
-          });
+      pathPoints.forEach((point) => bounds.extend(point));
+      map.fitBounds(bounds, { top: 80, right: 20, bottom: 200, left: 20 });
+    };
+
+    const drawPolyline = (pathPoints: Array<{ lat: number; lng: number }>) => {
+      const polyline = new (window as any).google.maps.Polyline({
+        path: pathPoints,
+        geodesic: true,
+        strokeColor: '#4FACFE',
+        strokeOpacity: 0.95,
+        strokeWeight: 5,
+        map,
+      });
+
+      routePolylineRef.current = polyline;
+      fitPathBounds(pathPoints);
+    };
+
+    const renderRoute = async () => {
+      try {
+        const googleMaps = (window as any).google?.maps;
+        if (!googleMaps) {
+          showSimplePath();
+          return;
+        }
+
+        // 1) Essayer l'API Routes moderne (Google recommande cette voie)
+        try {
+          const routesLib = await googleMaps.importLibrary?.('routes');
+          const routeApi = routesLib?.Route ?? googleMaps.routes?.Route;
+          const travelEnum = routesLib?.TravelMode;
+
+          if (routeApi?.computeRoutes) {
+            const response = await routeApi.computeRoutes({
+              origin: {
+                location: {
+                  latLng: {
+                    latitude: userLocation.latitude,
+                    longitude: userLocation.longitude,
+                  },
+                },
+              },
+              destination: {
+                location: {
+                  latLng: {
+                    latitude: destinationLat,
+                    longitude: destinationLng,
+                  },
+                },
+              },
+              travelMode:
+                travelMode === 'DRIVING'
+                  ? travelEnum?.DRIVE ?? 'DRIVE'
+                  : travelEnum?.WALK ?? 'WALK',
+              polylineQuality: 'HIGH_QUALITY',
+            });
+
+            const encodedPolyline = response?.routes?.[0]?.polyline?.encodedPolyline;
+            if (encodedPolyline) {
+              const decodedPath = decodePolyline(encodedPolyline);
+              if (decodedPath.length > 1) {
+                drawPolyline(decodedPath);
+                return;
+              }
+            }
+          }
+        } catch {
+          // Ignorer et tenter le fallback legacy juste après
+        }
+
+        // 2) Fallback: service Directions legacy
+        const directionsService = new googleMaps.DirectionsService();
+        const request = {
+          origin: { lat: userLocation.latitude, lng: userLocation.longitude },
+          destination: { lat: destinationLat, lng: destinationLng },
+          travelMode: googleMaps.TravelMode[travelMode],
+        };
+
+        directionsService.route(request, (result: any, status: any) => {
+          if (status === googleMaps.DirectionsStatus.OK && result && map) {
+            const renderer = new googleMaps.DirectionsRenderer({
+              suppressMarkers: true,
+              preserveViewport: false,
+              polylineOptions: {
+                strokeColor: '#4FACFE',
+                strokeOpacity: 0.95,
+                strokeWeight: 5,
+              },
+            });
+
+            renderer.setMap(map);
+            renderer.setDirections(result);
+            directionsRendererRef.current = renderer;
+
+            const routeBounds = result.routes?.[0]?.bounds;
+            if (routeBounds) {
+              map.fitBounds(routeBounds, { top: 80, right: 20, bottom: 200, left: 20 });
+            }
+          } else {
+            showSimplePath();
+          }
         });
-        map?.fitBounds(bounds, { top: 80, right: 20, bottom: 200, left: 20 });
+      } catch (error) {
+        console.error('Route rendering failed:', error);
+        showSimplePath();
       }
-    }).catch((error: any) => {
-      console.error('Erreur itinéraire:', error);
-    });
-  }, [directionsService, directionsRenderer, showDirections, userLocation, selectedPharmacy, map]);
+    };
+
+    void renderRoute();
+
+    function showSimplePath() {
+      if (!map) return;
+
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+        directionsRendererRef.current = null;
+      }
+
+      const fallbackPath = [
+        { lat: userLocation.latitude, lng: userLocation.longitude },
+        { lat: destinationLat, lng: destinationLng },
+      ];
+
+      let path = fallbackPath;
+      const overviewPolyline = (selectedPharmacy as any)?.directionsPolyline;
+      if (overviewPolyline) {
+        const decoded = decodePolyline(overviewPolyline);
+        if (decoded.length > 1) {
+          path = decoded;
+        }
+      }
+      
+      const bounds = new (window as any).google.maps.LatLngBounds();
+      path.forEach((point) => bounds.extend(point));
+      const polyline = new (window as any).google.maps.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: '#4FACFE',
+        strokeOpacity: 0.95,
+        strokeWeight: 5,
+        map,
+      });
+
+      routePolylineRef.current = polyline;
+
+      map.fitBounds(bounds, { top: 80, right: 20, bottom: 200, left: 20 });
+    }
+  }, [showDirections, userLocation, selectedPharmacy, map, travelMode]);
+
+  useEffect(() => {
+    return () => {
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+        directionsRendererRef.current = null;
+      }
+      if (routePolylineRef.current) {
+        routePolylineRef.current.setMap(null);
+        routePolylineRef.current = null;
+      }
+    };
+  }, []);
 
   return null;
 };
@@ -97,23 +263,43 @@ interface GoogleMapProps {
   pharmacies: Pharmacy[];
   selectedPharmacyId?: string;
   onPharmacySelect?: (pharmacy: Pharmacy) => void;
+  showDirections?: boolean;
+  onShowDirectionsChange?: (show: boolean) => void;
+  travelMode?: TravelMode;
 }
 
 export default function GoogleMapComponent({ 
   pharmacies, 
   selectedPharmacyId, 
-  onPharmacySelect
+  onPharmacySelect,
+  showDirections: externalShowDirections = false,
+  onShowDirectionsChange,
+  travelMode = 'WALKING',
 }: GoogleMapProps) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
   const { location: userLocation, loading: geoLoading } = useGeolocation();
   const [selectedMarker, setSelectedMarker] = useState<string | null>(selectedPharmacyId || null);
-  const [showDirections, setShowDirections] = useState(false);
+  const [showDirections, setShowDirectionsInternal] = useState(false);
+
+  // Synchronize external showDirections state
+  useEffect(() => {
+    setShowDirectionsInternal(externalShowDirections);
+  }, [externalShowDirections]);
+
+  const setShowDirections = useCallback((value: boolean) => {
+    setShowDirectionsInternal(value);
+    onShowDirectionsChange?.(value);
+  }, [onShowDirectionsChange]);
+
+  useEffect(() => {
+    setSelectedMarker(selectedPharmacyId || null);
+  }, [selectedPharmacyId]);
 
   const selectedPharmacy = pharmacies.find(p => p.id === selectedMarker) || null;
 
   const handleMarkerClick = useCallback((pharmacy: Pharmacy) => {
     setSelectedMarker(pharmacy.id);
-    setShowDirections(false);
+    setShowDirections(true);
     onPharmacySelect?.(pharmacy);
   }, [onPharmacySelect]);
 
@@ -130,7 +316,7 @@ export default function GoogleMapComponent({
 
   const defaultCenter = userLocation ? 
     { lat: userLocation.latitude, lng: userLocation.longitude } 
-    : { lat: -4.2634, lng: 15.2429 }; // Kinshasa, RDC fallback
+    : DEFAULT_CENTER;
 
   // Mémoriser les markers pour éviter les re-calculs
   const pharmacyMarkers = useMemo(() => 
@@ -144,7 +330,7 @@ export default function GoogleMapComponent({
 
   return (
     <>
-      <APIProvider apiKey={apiKey}>
+      <APIProvider apiKey={apiKey} libraries={['routes']}>
         <Map
           style={{ width: '100%', height: '100%' }}
           defaultCenter={defaultCenter}
@@ -170,15 +356,16 @@ export default function GoogleMapComponent({
           </div>
         )}
 
-        {/* Bouton recentrer */}
-        <RecenterButton userLocation={userLocation} />
-
         {/* Affichage de l'itinéraire */}
         <DirectionsDisplay 
           userLocation={userLocation}
           selectedPharmacy={selectedPharmacy}
           showDirections={showDirections}
+          travelMode={travelMode}
         />
+
+        {/* Bouton recentrer */}
+        <RecenterButton userLocation={userLocation} />
 
         {/* Pins des pharmacies */}
         {pharmacyMarkers.map((pharmacy) => (
@@ -188,59 +375,6 @@ export default function GoogleMapComponent({
             onClick={() => handleMarkerClick({ ...pharmacy })}
           >
             <Pin background="#006c51" glyphColor="#ffffff" borderColor="#ffffff" />
-
-            {selectedMarker === pharmacy.id && userLocation && (
-              <InfoWindow
-                position={{ lat: pharmacy.lat, lng: pharmacy.lng }}
-                onClose={() => setSelectedMarker(null)}
-                maxWidth={320}
-              >
-                <div className="p-4 space-y-3">
-                  <div>
-                    <h3 className="font-headline font-bold text-base" style={{ color: 'var(--text-primary)' }}>
-                      {pharmacy.name}
-                    </h3>
-                    <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                      {pharmacy.address}
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center justify-between py-2">
-                    <span className="text-xs font-semibold" style={{ color: 'var(--secondary)' }}>
-                      📍 {pharmacy.distance}
-                    </span>
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold" 
-                      style={{ 
-                        backgroundColor: pharmacy.isOpen ? 'rgba(0, 214, 143, 0.2)' : 'rgba(255, 77, 109, 0.2)',
-                        color: pharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)'
-                      }}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: pharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }}></span>
-                      {pharmacy.isOpen ? 'OUVERT' : 'FERMÉ'}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <a
-                      href={`tel:${pharmacy.phone}`}
-                      className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-transform"
-                      style={{ backgroundColor: 'var(--primary)', color: '#000000' }}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">call</span>
-                      Appeler
-                    </a>
-                    <button
-                      onClick={() => setShowDirections(true)}
-                      className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-semibold text-xs active:scale-95 transition-transform"
-                      style={{ backgroundColor: 'var(--secondary)', color: '#000000' }}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">directions</span>
-                      S'y rendre
-                    </button>
-                  </div>
-                </div>
-              </InfoWindow>
-            )}
           </AdvancedMarker>
         ))}
       </Map>

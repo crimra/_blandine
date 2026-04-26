@@ -1,25 +1,67 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import TopAppBar from '../components/TopAppBar';
 import BottomNav from '../components/BottomNav';
 import GoogleMapComponent from '../components/GoogleMap';
-import { pharmacies } from '../data/pharmacies';
+import { pharmacies as staticPharmacies } from '../data/pharmacies';
 import { useGeolocation } from '../hooks/useGeolocation';
-import { formatDistance, calculateDistance } from '../utils/directions';
+import { isPharmacyOpenNow } from '../utils/availability';
+import { fetchNearbyPharmacies } from '../services/pharmacyApi';
+import { calculateDistance } from '../utils/distance';
 import type { Pharmacy } from '../types/pharmacy';
 
+type TravelMode = 'WALKING' | 'DRIVING';
+
 export default function Map() {
+  const [searchParams] = useSearchParams();
   const [selectedPharmacy, setSelectedPharmacy] = useState<Pharmacy | null>(null);
   const [showDirections, setShowDirections] = useState(false);
   const [filter24h, setFilter24h] = useState(false);
   const [filterPCR, setFilterPCR] = useState(false);
   const [filterVaccines, setFilterVaccines] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { location: userLocation } = useGeolocation();
+  const [travelMode, setTravelMode] = useState<TravelMode>('WALKING');
+  const [nearbyPharmacies, setNearbyPharmacies] = useState<Pharmacy[]>([]);
+  const { location, permission } = useGeolocation();
 
-  const displayedPharmacy = selectedPharmacy || pharmacies[0];
+  // Fetch nearby pharmacies from Overpass API
+  useEffect(() => {
+    if (!location) return;
+    fetchNearbyPharmacies(location.latitude, location.longitude).then((results) => {
+      if (results.length > 0) setNearbyPharmacies(results);
+    }).catch(() => {});
+  }, [location]);
+
+  const selectedPlaceId = searchParams.get('placeId');
+
+  // Use API results or fallback to static data
+  const sourcePharmacies = nearbyPharmacies.length > 0 ? nearbyPharmacies : staticPharmacies;
+
+  const pharmaciesWithDistance = useMemo(() => {
+    if (!location) return sourcePharmacies.map(p => ({ ...p, isOpen: isPharmacyOpenNow(undefined, p.isOpen) }));
+    return sourcePharmacies
+      .filter(p => p.latitude && p.longitude)
+      .map(p => ({
+        ...p,
+        isOpen: isPharmacyOpenNow(undefined, p.isOpen),
+        calculatedDistance: calculateDistance(location.latitude, location.longitude, p.latitude!, p.longitude!),
+        distance: `${calculateDistance(location.latitude, location.longitude, p.latitude!, p.longitude!).toFixed(1)} km`
+      }))
+      .sort((a, b) => (a.calculatedDistance ?? 0) - (b.calculatedDistance ?? 0));
+  }, [location, sourcePharmacies]);
+
+  const preselectedPharmacy = selectedPlaceId
+    ? pharmaciesWithDistance.find(
+        (pharmacy) => pharmacy.placeId === selectedPlaceId || pharmacy.id === selectedPlaceId
+      )
+    : null;
+
+  const displayedPharmacy = selectedPharmacy || preselectedPharmacy || pharmaciesWithDistance[0];
+  const hasDestinationCoordinates =
+    displayedPharmacy?.latitude !== undefined && displayedPharmacy?.longitude !== undefined;
 
   // Filter pharmacies based on active filters and search
-  const filteredPharmacies = pharmacies.filter((pharmacy) => {
+  const filteredPharmacies = pharmaciesWithDistance.filter((pharmacy) => {
     if (filter24h && !pharmacy.isOpen24h) return false;
     if (filterPCR && !pharmacy.offersPCR) return false;
     if (filterVaccines && !pharmacy.offersVaccines) return false;
@@ -39,13 +81,29 @@ export default function Map() {
         {/* Google Map */}
         <GoogleMapComponent 
           pharmacies={filteredPharmacies}
+          selectedPharmacyId={selectedPharmacy?.id || preselectedPharmacy?.id}
           onPharmacySelect={setSelectedPharmacy}
+          showDirections={showDirections}
+          onShowDirectionsChange={setShowDirections}
+          travelMode={travelMode}
         />
 
         {/* Overlay UI */}
         <div className="absolute inset-0 pt-16 pb-20 pointer-events-none z-10 flex flex-col">
           {/* Search & Filters Container */}
           <div className="max-w-md mx-auto pointer-events-auto space-y-4 p-5">
+            {permission === 'denied' && (
+              <div
+                className="rounded-xl px-4 py-3 text-xs font-semibold border"
+                style={{
+                  backgroundColor: 'rgba(255, 184, 0, 0.15)',
+                  borderColor: 'var(--accent-warning)',
+                  color: 'var(--text-primary)'
+                }}
+              >
+                Geolocalisation refusee. Position de secours activee (Congo). Active le GPS pour une precision locale.
+              </div>
+            )}
             {/* Search Bar */}
             <div className="flex items-center backdrop-blur-md rounded-full px-4 h-14 shadow-lg border" style={{ backgroundColor: 'rgba(22, 24, 32, 0.9)', borderColor: 'var(--border-subtle)' }}>
               <span className="material-symbols-outlined" style={{ color: 'var(--text-tertiary)' }}>search</span>
@@ -62,6 +120,32 @@ export default function Map() {
 
             {/* Chips */}
             <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-2 -mx-2 px-2">
+              <button 
+                onClick={() => setTravelMode('WALKING')}
+                className="flex items-center gap-1 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm transition active:scale-95" 
+                style={{ 
+                  backgroundColor: travelMode === 'WALKING' ? 'var(--secondary)' : 'var(--surface-primary)', 
+                  color: travelMode === 'WALKING' ? '#000000' : 'var(--text-secondary)',
+                  borderColor: 'var(--border-subtle)',
+                  border: travelMode === 'WALKING' ? 'none' : '1px solid'
+                }}
+              >
+                <span className="material-symbols-outlined text-[16px]">directions_walk</span>
+                A pied
+              </button>
+              <button 
+                onClick={() => setTravelMode('DRIVING')}
+                className="flex items-center gap-1 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm transition active:scale-95" 
+                style={{ 
+                  backgroundColor: travelMode === 'DRIVING' ? 'var(--secondary)' : 'var(--surface-primary)', 
+                  color: travelMode === 'DRIVING' ? '#000000' : 'var(--text-secondary)',
+                  borderColor: 'var(--border-subtle)',
+                  border: travelMode === 'DRIVING' ? 'none' : '1px solid'
+                }}
+              >
+                <span className="material-symbols-outlined text-[16px]">directions_car</span>
+                Voiture
+              </button>
               <button 
                 onClick={() => setFilter24h(!filter24h)}
                 className="flex items-center gap-1 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap shadow-sm transition active:scale-95" 
@@ -119,26 +203,34 @@ export default function Map() {
                     {selectedPharmacy ? 'Sélectionné' : 'La plus proche'}
                   </span>
                   <h2 className="text-xl font-extrabold font-headline leading-tight" style={{ color: 'var(--text-primary)' }}>
-                    {selectedPharmacy?.name || pharmacies[0].name}
+                    {displayedPharmacy.name}
                   </h2>
                   <p className="text-xs font-body" style={{ color: 'var(--text-secondary)' }}>
-                    {selectedPharmacy?.address || pharmacies[0].address}
+                    {displayedPharmacy.address}
                   </p>
                 </div>
                 <div className="flex flex-col items-end">
                   <span className="text-sm font-bold font-headline" style={{ color: 'var(--secondary)' }}>
-                    {selectedPharmacy?.distance || pharmacies[0].distance}
+                    {displayedPharmacy.distance}
                   </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mt-2" style={{ backgroundColor: (selectedPharmacy?.isOpen || pharmacies[0].isOpen) ? 'rgba(0, 214, 143, 0.2)' : 'rgba(255, 77, 109, 0.2)', color: (selectedPharmacy?.isOpen || pharmacies[0].isOpen) ? 'var(--primary)' : 'var(--accent-error)' }}>
-                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: (selectedPharmacy?.isOpen || pharmacies[0].isOpen) ? 'var(--primary)' : 'var(--accent-error)' }}></span>
-                    {selectedPharmacy?.isOpen || pharmacies[0].isOpen ? 'OUVERT' : 'FERMÉ'}
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mt-2" style={{ backgroundColor: displayedPharmacy.isOpen ? 'rgba(0, 214, 143, 0.2)' : 'rgba(255, 77, 109, 0.2)', color: displayedPharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }}>
+                    <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: displayedPharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }}></span>
+                    {displayedPharmacy.isOpen ? 'OUVERT' : 'FERMÉ'}
                   </span>
                 </div>
               </div>
               <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowDirections(true)}
-                  className="flex-1 py-3 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--primary)', color: '#000000' }}>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setSelectedPharmacy(displayedPharmacy);
+                    setShowDirections(true);
+                  }}
+                  disabled={!hasDestinationCoordinates}
+                  className="relative z-20 pointer-events-auto flex-1 py-3 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform flex items-center justify-center gap-2 disabled:opacity-60"
+                  style={{ backgroundColor: 'var(--primary)', color: '#000000' }}>
                   <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                     directions
                   </span>
@@ -152,147 +244,16 @@ export default function Map() {
                   </span>
                 </a>
               </div>
+              {showDirections && (
+                <p className="mt-3 text-[11px] font-semibold" style={{ color: 'var(--secondary)' }}>
+                  Itineraire {travelMode === 'WALKING' ? 'a pied' : 'en voiture'} actif. Tracage en cours sur la carte.
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Floating Action Button */}
-          <div className="absolute bottom-40 right-5 pointer-events-auto">
-            <button className="w-12 h-12 text-primary rounded-full shadow-lg flex items-center justify-center border active:scale-90 transition-transform" style={{ backgroundColor: 'var(--surface-primary)', borderColor: 'var(--border-subtle)' }}>
-              <span className="material-symbols-outlined">my_location</span>
-            </button>
-          </div>
         </div>
       </main>
-
-      {/* Directions Panel */}
-      {showDirections && userLocation && displayedPharmacy && (
-        <div className="fixed inset-0 z-40 flex items-end">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0"
-            onClick={() => setShowDirections(false)}
-            style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)' }}
-          />
-
-          {/* Direction Panel */}
-          <div
-            className="relative w-full max-w-md mx-auto rounded-t-3xl p-6 shadow-2xl"
-            style={{ backgroundColor: 'var(--surface-primary)' }}
-          >
-            {/* Close Button */}
-            <button
-              onClick={() => setShowDirections(false)}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ backgroundColor: 'var(--surface-secondary)' }}
-            >
-              <span className="material-symbols-outlined" style={{ color: 'var(--text-primary)' }}>close</span>
-            </button>
-
-            {/* Pharmacy Info */}
-            <div className="space-y-6">
-              {/* Header */}
-              <div>
-                <h2 className="font-headline font-bold text-xl" style={{ color: 'var(--text-primary)' }}>
-                  {displayedPharmacy.name}
-                </h2>
-                <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-                  {displayedPharmacy.address}
-                </p>
-              </div>
-
-              {/* Distance & Time */}
-              <div className="grid grid-cols-3 gap-3">
-                <div
-                  className="rounded-lg p-3 text-center"
-                  style={{ backgroundColor: 'var(--surface-secondary)' }}
-                >
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Distance</p>
-                  <p className="font-bold text-lg mt-1" style={{ color: 'var(--primary)' }}>
-                    {userLocation && displayedPharmacy.latitude && displayedPharmacy.longitude
-                      ? formatDistance(
-                          calculateDistance(
-                            userLocation.latitude,
-                            userLocation.longitude,
-                            displayedPharmacy.latitude,
-                            displayedPharmacy.longitude
-                          )
-                        )
-                      : '—'}
-                  </p>
-                </div>
-                <div
-                  className="rounded-lg p-3 text-center"
-                  style={{ backgroundColor: 'var(--surface-secondary)' }}
-                >
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>À pied</p>
-                  <p className="font-bold text-lg mt-1" style={{ color: 'var(--secondary)' }}>
-                    {userLocation && displayedPharmacy.latitude && displayedPharmacy.longitude
-                      ? `~${Math.round(
-                          (calculateDistance(
-                            userLocation.latitude,
-                            userLocation.longitude,
-                            displayedPharmacy.latitude,
-                            displayedPharmacy.longitude
-                          ) /
-                            1.4) *
-                            60
-                        )} min`
-                      : '—'}
-                  </p>
-                </div>
-                <div
-                  className="rounded-lg p-3 text-center"
-                  style={{ backgroundColor: 'var(--surface-secondary)' }}
-                >
-                  <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>Ouvert</p>
-                  <p
-                    className="font-bold text-lg mt-1"
-                    style={{ color: displayedPharmacy.isOpen ? 'var(--primary)' : 'var(--accent-error)' }}
-                  >
-                    {displayedPharmacy.isOpen ? '✓' : '✗'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Simple direction */}
-              <div
-                className="flex items-center gap-3 p-4 rounded-lg"
-                style={{ backgroundColor: 'var(--surface-secondary)' }}
-              >
-                <span className="text-4xl">📍</span>
-                <div className="flex-1">
-                  <p className="font-semibold" style={{ color: 'var(--primary)' }}>
-                    Itinéraire affichée sur la carte
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                    Suivez le chemin bleu pour vous rendre à la pharmacie
-                  </p>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2 pt-3">
-                <a
-                  href={`tel:${displayedPharmacy.phone}`}
-                  className="flex-1 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                  style={{ backgroundColor: 'var(--primary)', color: '#000000' }}
-                >
-                  <span className="material-symbols-outlined">call</span>
-                  Appeler {displayedPharmacy.phone}
-                </a>
-                <button
-                  onClick={() => setShowDirections(false)}
-                  className="flex-1 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 active:scale-95 transition-transform"
-                  style={{ backgroundColor: 'var(--surface-secondary)', color: 'var(--text-primary)' }}
-                >
-                  <span className="material-symbols-outlined">close</span>
-                  Fermer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <BottomNav />
     </div>

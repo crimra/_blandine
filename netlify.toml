@@ -1,4 +1,11 @@
 [build]
 base = "blandine"
 command = "npm run build"
-publish = "blandine/dist"
+# Relatif à `base` : correspond à blandine/dist
+publish = "dist"
+
+# SPA : toutes les routes (/map, /details/:id...) servent index.html
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200

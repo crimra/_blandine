@@ -1,167 +1,184 @@
 import { useParams } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
-import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { APIProvider, APILoadingStatus, Map, AdvancedMarker, useMap, useApiLoadingStatus } from '@vis.gl/react-google-maps';
 import TopAppBar from '../components/TopAppBar';
-import { pharmacies } from '../data/pharmacies';
+import MapErrorBoundary from '../components/MapErrorBoundary';
+import { usePharmacy } from '../hooks/usePharmacy';
 import { useGeolocation } from '../hooks/useGeolocation';
+import { getDirectionSteps } from '../utils/directions';
 import { formatDirectionSteps, getDirectionsSummary, decodePolyline } from '../utils/googleDirections';
+import type { Pharmacy } from '../types/pharmacy';
+
+// Au-delà, on considère que Google ne répondra pas (clé refusée, réseau...)
+const ROUTE_TIMEOUT_MS = 10000;
+
+type LatLng = { lat: number; lng: number };
+
+// Itinéraire de secours à vol d'oiseau, au même format qu'une réponse DirectionsService
+function buildStraightLineRoute(
+  userLocation: { latitude: number; longitude: number },
+  destination: Pharmacy & { latitude: number; longitude: number }
+) {
+  const [step] = getDirectionSteps(
+    userLocation.latitude,
+    userLocation.longitude,
+    destination.latitude,
+    destination.longitude
+  );
+  const leg = { distance: { text: step.distance }, duration: { text: step.time.replace(' de marche', '') } };
+
+  return {
+    routes: [{
+      legs: [{
+        ...leg,
+        start_address: 'Votre position',
+        end_address: destination.address,
+        steps: [{ ...leg, instructions: `${step.direction} (à vol d'oiseau)` }],
+      }],
+    }],
+  };
+}
+
+// Signale une clé refusée ou un script non chargé. Doit rester hors de <Map>,
+// qui démonte ses enfants en cas d'AUTH_FAILURE.
+const ApiFailureWatcher = ({ onFailure }: { onFailure: () => void }) => {
+  const apiStatus = useApiLoadingStatus();
+
+  useEffect(() => {
+    if (apiStatus === APILoadingStatus.AUTH_FAILURE || apiStatus === APILoadingStatus.FAILED) {
+      onFailure();
+    }
+  }, [apiStatus, onFailure]);
+
+  return null;
+};
 
 // Composant pour afficher l'itinéraire sur la carte mini
-const DirectionsRenderer = ({ 
-  userLocation, 
+const DirectionsRenderer = ({
+  userLocation,
   destination,
-  onDataReceived
-}: { 
-  userLocation: any; 
+  onRouteReady,
+  onRouteFailed,
+}: {
+  userLocation: any;
   destination: any;
-  onDataReceived: (data: any) => void;
+  onRouteReady: (data: any) => void;
+  onRouteFailed: () => void;
 }) => {
   const map = useMap();
   const routePolylineRef = useRef<any>(null);
-  const hasProcessed = useRef(false);
 
   useEffect(() => {
-    if (!map || !userLocation || !destination || hasProcessed.current) return;
+    if (!map || !userLocation || !destination) return;
+
+    const googleMaps = (window as any).google?.maps;
+    const origin = { lat: userLocation.latitude, lng: userLocation.longitude };
+    const target = { lat: destination.latitude, lng: destination.longitude };
+    let settled = false;
+
+    const drawPath = (path: LatLng[] | unknown[]) => {
+      try {
+        routePolylineRef.current?.setMap(null);
+        routePolylineRef.current = new googleMaps.Polyline({
+          path,
+          geodesic: true,
+          strokeColor: '#4FACFE',
+          strokeOpacity: 0.95,
+          strokeWeight: 5,
+          map,
+        });
+
+        const bounds = new googleMaps.LatLngBounds();
+        bounds.extend(origin);
+        bounds.extend(target);
+        map.fitBounds(bounds, { top: 80, right: 20, bottom: 80, left: 20 });
+      } catch {
+        // Carte inutilisable (ex: clé refusée) : le résumé texte reste affiché
+      }
+    };
+
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      drawPath([origin, target]);
+      onRouteFailed();
+    };
+
+    const timeoutId = setTimeout(fail, ROUTE_TIMEOUT_MS);
 
     try {
-      // Essayer d'utiliser le service Directions
-      const directionsService = new (window as any).google.maps.DirectionsService();
-      const request = {
-        origin: { lat: userLocation.latitude, lng: userLocation.longitude },
-        destination: { lat: destination.latitude, lng: destination.longitude },
-        travelMode: (window as any).google.maps.TravelMode.WALKING,
-      };
+      const directionsService = new googleMaps.DirectionsService();
+      const request = { origin, destination: target, travelMode: googleMaps.TravelMode.WALKING };
 
       directionsService.route(request, (result: any, status: any) => {
-        if (status === (window as any).google.maps.DirectionsStatus.OK) {
-          // Décoder et afficher la polyline
-          const overviewPolyline = result.routes[0]?.overview_polyline?.points;
-          if (overviewPolyline) {
-            const decodedPath = decodePolyline(overviewPolyline);
-            
-            const polyline = new (window as any).google.maps.Polyline({
-              path: decodedPath,
-              geodesic: true,
-              strokeColor: '#4FACFE',
-              strokeOpacity: 0.95,
-              strokeWeight: 5,
-              map,
-            });
-
-            routePolylineRef.current = polyline;
-          }
-
-          // Ajuster la vue
-          const bounds = new (window as any).google.maps.LatLngBounds();
-          bounds.extend({ lat: userLocation.latitude, lng: userLocation.longitude });
-          bounds.extend({ lat: destination.latitude, lng: destination.longitude });
-          map.fitBounds(bounds, { top: 80, right: 20, bottom: 80, left: 20 });
-
-          onDataReceived(result);
-          hasProcessed.current = true;
-        } else {
-          // Si l'API Directions échoue, afficher une ligne simple
-          showSimplePath();
+        if (settled) return;
+        if (status !== googleMaps.DirectionsStatus.OK || !result?.routes?.[0]) {
+          fail();
+          return;
         }
+
+        settled = true;
+        clearTimeout(timeoutId);
+
+        // L'API JS fournit overview_path (LatLng[]) et overview_polyline (chaine encodee)
+        const route = result.routes[0];
+        const encodedPolyline =
+          typeof route.overview_polyline === 'string' ? route.overview_polyline : route.overview_polyline?.points;
+        const path = route.overview_path ?? (encodedPolyline ? decodePolyline(encodedPolyline) : null);
+        drawPath(path && path.length > 1 ? path : [origin, target]);
+        onRouteReady(result);
       });
     } catch {
-      // Si erreur, afficher une ligne simple
-      showSimplePath();
-    }
-
-    function showSimplePath() {
-      const polyline = new (window as any).google.maps.Polyline({
-        path: [
-          { lat: userLocation.latitude, lng: userLocation.longitude },
-          { lat: destination.latitude, lng: destination.longitude },
-        ],
-        geodesic: true,
-        strokeColor: '#4FACFE',
-        strokeOpacity: 0.95,
-        strokeWeight: 5,
-        map,
-      });
-
-      routePolylineRef.current = polyline;
-
-      // Ajuster la vue
-      const bounds = new (window as any).google.maps.LatLngBounds();
-      bounds.extend({ lat: userLocation.latitude, lng: userLocation.longitude });
-      bounds.extend({ lat: destination.latitude, lng: destination.longitude });
-      map.fitBounds(bounds, { top: 80, right: 20, bottom: 80, left: 20 });
-
-      // Créer des données simulées
-      const distance = Math.round(
-        Math.sqrt(
-          Math.pow(destination.latitude - userLocation.latitude, 2) +
-          Math.pow(destination.longitude - userLocation.longitude, 2)
-        ) * 111 * 100
-      ) / 100; // approximatif en km
-
-      const mockData = {
-        routes: [{
-          legs: [{
-            distance: { text: `${distance} km`, value: distance * 1000 },
-            duration: { text: `${Math.round(distance * 12)} min`, value: distance * 720 },
-            start_address: 'Votre position',
-            end_address: destination.address,
-            steps: [{
-              html_instructions: 'Direction générale',
-              distance: { text: `${distance} km` },
-              duration: { text: `${Math.round(distance * 12)} min` },
-            }]
-          }]
-        }]
-      };
-
-      onDataReceived(mockData);
-      hasProcessed.current = true;
+      fail();
     }
 
     return () => {
-      if (routePolylineRef.current) {
-        routePolylineRef.current.setMap(null);
-        routePolylineRef.current = null;
-      }
+      settled = true;
+      clearTimeout(timeoutId);
+      routePolylineRef.current?.setMap(null);
+      routePolylineRef.current = null;
     };
-  }, [map, userLocation, destination, onDataReceived]);
+  }, [map, userLocation, destination, onRouteReady, onRouteFailed]);
 
   return null;
 };
 
 export default function Directions() {
   const { id } = useParams();
-  const pharmacy = pharmacies.find(p => p.id === id);
+  const { pharmacy, loading: pharmacyLoading } = usePharmacy(id);
   const { location: userLocation } = useGeolocation();
-  const [steps, setSteps] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [routeData, setRouteData] = useState<any>(null);
+  const [routeFailed, setRouteFailed] = useState(false);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
-  const handleDirectionsData = (data: any) => {
-    if (data) {
-      setSteps(formatDirectionSteps(data));
-      setSummary(getDirectionsSummary(data));
-      setLoading(false);
-    }
-  };
+  // Références stables : sinon chaque rendu relance l'effet du renderer, qui efface le tracé
+  const handleRouteReady = useCallback((data: any) => setRouteData(data), []);
+  const handleRouteFailed = useCallback(() => setRouteFailed(true), []);
 
-  useEffect(() => {
-    // Vérifier les conditions initiales
-    if (!pharmacy) {
-      setError('Pharmacie non trouvée');
-    } else if (pharmacy.latitude === undefined || pharmacy.longitude === undefined) {
-      setError('Les coordonnées de la pharmacie ne sont pas disponibles');
-    } else if (userLocation) {
-      // On a tout ce qu'il faut, nettoyer l'erreur
-      setError(null);
-    }
-    // Note: on ne fixe pas d'erreur si userLocation est null, la carte va attendre sa disponibilité
-  }, [pharmacy, userLocation]);
+  const destination =
+    pharmacy && pharmacy.latitude !== undefined && pharmacy.longitude !== undefined
+      ? (pharmacy as Pharmacy & { latitude: number; longitude: number })
+      : null;
+
+  const fallbackData = useMemo(
+    () => (userLocation && destination ? buildStraightLineRoute(userLocation, destination) : null),
+    [userLocation, destination]
+  );
+
+  const error = pharmacy && !destination ? 'Les coordonnées de la pharmacie ne sont pas disponibles' : null;
+  const directionsData = routeData ?? (routeFailed || !apiKey ? fallbackData : null);
+  const isFallback = !routeData && directionsData !== null;
+  const steps = directionsData ? formatDirectionSteps(directionsData) : [];
+  const summary = directionsData ? getDirectionsSummary(directionsData) : null;
+  const loading = !directionsData && !error;
+
+  if (pharmacyLoading) {
+    return <div className="bg-background text-on-background min-h-screen pt-24 px-5">Chargement de la pharmacie...</div>;
+  }
 
   if (!pharmacy) {
-    return <div className="bg-background text-on-background min-h-screen">Pharmacie non trouvée</div>;
+    return <div className="bg-background text-on-background min-h-screen pt-24 px-5">Pharmacie non trouvée</div>;
   }
 
   return (
@@ -177,33 +194,37 @@ export default function Directions() {
         {/* Mini Map */}
         {userLocation && pharmacy.latitude && pharmacy.longitude && apiKey && (
           <section className="px-5 mb-6 h-64 rounded-2xl overflow-hidden shadow-lg">
-            <APIProvider apiKey={apiKey}>
-              <Map
-                style={{ width: '100%', height: '100%' }}
-                defaultCenter={{ lat: userLocation.latitude, lng: userLocation.longitude }}
-                defaultZoom={14}
-                mapId="DEMO_MAP_ID"
-                gestureHandling="greedy"
-              >
-                <AdvancedMarker
-                  position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
-                  title="Votre position"
+            <MapErrorBoundary onError={handleRouteFailed}>
+              <APIProvider apiKey={apiKey}>
+                <ApiFailureWatcher onFailure={handleRouteFailed} />
+                <Map
+                  style={{ width: '100%', height: '100%' }}
+                  defaultCenter={{ lat: userLocation.latitude, lng: userLocation.longitude }}
+                  defaultZoom={14}
+                  mapId="DEMO_MAP_ID"
+                  gestureHandling="greedy"
                 >
-                  <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
-                </AdvancedMarker>
-                <AdvancedMarker
-                  position={{ lat: pharmacy.latitude, lng: pharmacy.longitude }}
-                  title={pharmacy.name}
-                >
-                  <div className="w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg" />
-                </AdvancedMarker>
-                <DirectionsRenderer 
-                  userLocation={userLocation}
-                  destination={pharmacy}
-                  onDataReceived={handleDirectionsData}
-                />
-              </Map>
-            </APIProvider>
+                  <AdvancedMarker
+                    position={{ lat: userLocation.latitude, lng: userLocation.longitude }}
+                    title="Votre position"
+                  >
+                    <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
+                  </AdvancedMarker>
+                  <AdvancedMarker
+                    position={{ lat: pharmacy.latitude, lng: pharmacy.longitude }}
+                    title={pharmacy.name}
+                  >
+                    <div className="w-6 h-6 bg-green-500 rounded-full border-2 border-white shadow-lg" />
+                  </AdvancedMarker>
+                  <DirectionsRenderer 
+                    userLocation={userLocation}
+                    destination={pharmacy}
+                    onRouteReady={handleRouteReady}
+                    onRouteFailed={handleRouteFailed}
+                  />
+                </Map>
+              </APIProvider>
+            </MapErrorBoundary>
           </section>
         )}
 
@@ -227,6 +248,11 @@ export default function Directions() {
                   <p className="text-sm text-on-surface-variant">Distance totale</p>
                 </div>
               </div>
+              {isFallback && (
+                <p className="mt-4 text-xs text-center text-on-surface-variant">
+                  Itinéraire Google indisponible : estimation à vol d'oiseau, à pied.
+                </p>
+              )}
             </div>
           </section>
         )}
@@ -283,7 +309,7 @@ export default function Directions() {
 
                     {/* Step content */}
                     <div className="flex-1 bg-surface-container-low rounded-xl p-4">
-                      <p className="text-on-surface font-medium mb-2" dangerouslySetInnerHTML={{ __html: step.instruction }} />
+                      <p className="text-on-surface font-medium mb-2">{step.instruction}</p>
                       <div className="flex gap-4 text-sm text-on-surface-variant">
                         <div className="flex items-center gap-1">
                           <span className="material-symbols-outlined text-[16px]">distance</span>

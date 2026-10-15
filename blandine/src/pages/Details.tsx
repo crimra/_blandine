@@ -1,14 +1,18 @@
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import TopAppBar from '../components/TopAppBar';
-import { pharmacies } from '../data/pharmacies';
+import { usePharmacy } from '../hooks/usePharmacy';
 import { isPharmacyOpenNow } from '../utils/availability';
 
 export default function Details() {
   const { id } = useParams();
-  const pharmacy = pharmacies.find(p => p.id === id);
+  const { pharmacy, loading } = usePharmacy(id);
+
+  if (loading) {
+    return <div className="bg-background text-on-background min-h-screen pt-24 px-5">Chargement de la pharmacie...</div>;
+  }
 
   if (!pharmacy) {
-    return <div>Pharmacie non trouvée</div>;
+    return <div className="bg-background text-on-background min-h-screen pt-24 px-5">Pharmacie non trouvée</div>;
   }
 
   const isOpenNow = isPharmacyOpenNow(undefined, pharmacy.isOpen);
@@ -56,13 +60,13 @@ export default function Details() {
 
             {/* Action Buttons */}
             <div className="flex gap-3 mt-8">
-              <a 
-                href={`/directions/${pharmacy.id}`}
+              <Link
+                to={`/directions/${pharmacy.id}`}
                 className="flex-1 flex items-center justify-center gap-2 bg-secondary-container text-on-secondary-container py-4 rounded-xl font-semibold active:scale-[0.98] transition-all"
               >
                 <span className="material-symbols-outlined">directions</span>
                 Itinéraire
-              </a>
+              </Link>
               <a 
                 href={`tel:${pharmacy?.phone || ''}`}
                 className="flex-1 flex items-center justify-center gap-2 bg-surface-container-high text-on-surface py-4 rounded-xl font-semibold active:scale-[0.98] transition-all"

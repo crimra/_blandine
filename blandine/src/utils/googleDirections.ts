@@ -13,14 +13,13 @@ export interface DirectionsResult {
         distance: { text: string; value: number };
         duration: { text: string; value: number };
         end_location: { lat: number; lng: number };
-        html_instructions: string;
+        instructions?: string; // API JavaScript (DirectionsService)
+        html_instructions?: string; // API web REST
         start_location: { lat: number; lng: number };
         travel_mode: string;
       }>;
     }>;
-    overview_polyline: {
-      points: string;
-    };
+    overview_polyline?: string | { points: string };
   }>;
   status: string;
 }
@@ -123,7 +122,7 @@ export function formatDirectionSteps(
   legs.forEach((leg) => {
     leg.steps.forEach((step) => {
       // Supprimer les balises HTML
-      const instruction = step.html_instructions
+      const instruction = (step.instructions ?? step.html_instructions ?? '')
         .replace(/<[^>]*>/g, '')
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')

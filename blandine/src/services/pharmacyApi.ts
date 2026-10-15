@@ -1,4 +1,5 @@
 import type { Pharmacy } from '../types/pharmacy';
+import { pharmacies as staticPharmacies } from '../data/pharmacies';
 import { calculateDistance } from '../utils/distance';
 
 type OverpassElement = {
@@ -29,6 +30,9 @@ const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 const MAX_RETRIES_PER_ENDPOINT = 2;
 
 const nearbyCache = new Map<string, { timestamp: number; items: Pharmacy[] }>();
+// Pharmacies deja recuperees, pour que Details/Directions les retrouvent par id
+const knownPharmacies = new Map<string, Pharmacy>();
+const OSM_ID_PATTERN = /^osm-(node|way|relation)-(\d+)$/;
 
 function inferOpenStatus(openingHours?: string): { isOpen: boolean; isOpen24h: boolean; status: 'guard' | 'normal' } {
   if (!openingHours) {
@@ -60,7 +64,7 @@ function buildAddress(tags: Record<string, string>): string {
   return tags['name'] ? `Zone: ${tags['name']}` : 'Adresse non renseignee';
 }
 
-function toPharmacy(element: OverpassElement, originLat: number, originLng: number): Pharmacy | null {
+function toPharmacy(element: OverpassElement, origin?: { lat: number; lng: number }): Pharmacy | null {
   const tags = element.tags ?? {};
   const lat = element.lat ?? element.center?.lat;
   const lng = element.lon ?? element.center?.lon;
@@ -71,14 +75,13 @@ function toPharmacy(element: OverpassElement, originLat: number, originLng: numb
 
   const openingHours = tags['opening_hours'];
   const { isOpen, isOpen24h, status } = inferOpenStatus(openingHours);
-  const distanceKm = calculateDistance(originLat, originLng, lat, lng);
 
   return {
     id: `osm-${element.type}-${element.id}`,
     placeId: `osm-${element.type}-${element.id}`,
     name: tags['name'] || 'Pharmacie locale',
     address: buildAddress(tags),
-    distance: `${distanceKm.toFixed(1)} km`,
+    distance: origin ? `${calculateDistance(origin.lat, origin.lng, lat, lng).toFixed(1)} km` : '--',
     phone: tags['phone'] || tags['contact:phone'] || 'Non disponible',
     hours: {
       'Horaires': openingHours || 'Non renseignes',
@@ -216,12 +219,13 @@ export async function fetchNearbyPharmacies(
       try {
         const data = await fetchOverpass(endpoint, query);
         const mapped = (data.elements ?? [])
-          .map((element) => toPharmacy(element, latitude, longitude))
+          .map((element) => toPharmacy(element, { lat: latitude, lng: longitude }))
           .filter((value): value is Pharmacy => value !== null);
 
         const unique = dedupeAndSort(mapped, limit);
 
         if (unique.length > 0) {
+          unique.forEach((pharmacy) => knownPharmacies.set(pharmacy.id, pharmacy));
           nearbyCache.set(primaryCacheKey, { timestamp: Date.now(), items: unique });
           return unique;
         }
@@ -236,4 +240,51 @@ export async function fetchNearbyPharmacies(
   }
 
   return [];
+}
+
+export function isOsmPharmacyId(id: string): boolean {
+  return OSM_ID_PATTERN.test(id);
+}
+
+export function getKnownPharmacy(id: string): Pharmacy | undefined {
+  return staticPharmacies.find((pharmacy) => pharmacy.id === id) ?? knownPharmacies.get(id);
+}
+
+// Requetes par id en cours, pour ne pas interroger Overpass deux fois pour la meme pharmacie
+const pendingById = new Map<string, Promise<Pharmacy | null>>();
+
+// Recupere une pharmacie OSM par son id (utile apres un rechargement de page)
+export function fetchPharmacyById(id: string): Promise<Pharmacy | null> {
+  const known = getKnownPharmacy(id);
+  if (known) return Promise.resolve(known);
+
+  const pending = pendingById.get(id);
+  if (pending) return pending;
+
+  const request = fetchOsmPharmacy(id).finally(() => pendingById.delete(id));
+  pendingById.set(id, request);
+  return request;
+}
+
+async function fetchOsmPharmacy(id: string): Promise<Pharmacy | null> {
+  const match = OSM_ID_PATTERN.exec(id);
+  if (!match) return null;
+
+  const [, type, osmId] = match;
+  const query = `[out:json][timeout:25];${type}(${osmId});out center tags;`;
+  let lastError: unknown = null;
+
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const data = await fetchOverpass(endpoint, query);
+      const element = data.elements?.[0];
+      const pharmacy = element ? toPharmacy(element) : null;
+      if (pharmacy) knownPharmacies.set(pharmacy.id, pharmacy);
+      return pharmacy;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw new Error(lastError instanceof Error ? lastError.message : 'Impossible de recuperer la pharmacie');
 }

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import TopAppBar from '../components/TopAppBar';
 import BottomNav from '../components/BottomNav';
 import GoogleMapComponent from '../components/GoogleMap';
+import MapErrorBoundary from '../components/MapErrorBoundary';
 import { pharmacies as staticPharmacies } from '../data/pharmacies';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { isPharmacyOpenNow } from '../utils/availability';
@@ -79,14 +80,16 @@ export default function Map() {
       <TopAppBar />
       <main className="relative flex-1 w-full pt-16 pb-20 overflow-hidden">
         {/* Google Map */}
-        <GoogleMapComponent 
-          pharmacies={filteredPharmacies}
-          selectedPharmacyId={selectedPharmacy?.id || preselectedPharmacy?.id}
-          onPharmacySelect={setSelectedPharmacy}
-          showDirections={showDirections}
-          onShowDirectionsChange={setShowDirections}
-          travelMode={travelMode}
-        />
+        <MapErrorBoundary>
+          <GoogleMapComponent 
+            pharmacies={filteredPharmacies}
+            selectedPharmacyId={selectedPharmacy?.id || preselectedPharmacy?.id}
+            onPharmacySelect={setSelectedPharmacy}
+            showDirections={showDirections}
+            onShowDirectionsChange={setShowDirections}
+            travelMode={travelMode}
+          />
+        </MapErrorBoundary>
 
         {/* Overlay UI */}
         <div className="absolute inset-0 pt-16 pb-20 pointer-events-none z-10 flex flex-col">
